@@ -2,16 +2,24 @@ from __future__ import annotations
 
 import streamlit as st
 
+from src.config import ApiConfig, load_api_config
 from src.llm import chat_stream, create_client
 from src.prompt import build_system_prompt
 from src.search import web_search
-from src.config import ApiConfig, load_api_config
+from src.sessions import (
+    bump_session_order,
+    current_messages,
+    init_sessions,
+    render_session_sidebar,
+    set_current_messages,
+    touch_session_title,
+)
 
 st.set_page_config(
     page_title="张雪峰 · 志愿顾问",
     page_icon="🎓",
-    layout="centered",
-    initial_sidebar_state="collapsed",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 EXAMPLES = [
@@ -45,22 +53,6 @@ def needs_web_search(text: str) -> bool:
     return any(kw.lower() in lowered for kw in NEEDS_SEARCH_HINTS)
 
 
-def init_state() -> None:
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
-
-def render_sidebar() -> None:
-    with st.sidebar:
-        st.markdown("### 关于")
-        st.caption("高考志愿 / 考研 / 职业规划的 AI 对话演示")
-        st.markdown("[zhangxuefeng-skill](https://github.com/XinaiLU/zhangxuefeng-skill)")
-        st.caption("角色扮演基于公开言论推断，非张雪峰本人观点，仅供参考。")
-        if st.button("清空对话", use_container_width=True):
-            st.session_state.messages = []
-            st.rerun()
-
-
 def ensure_api_config() -> ApiConfig:
     config = load_api_config()
     if not config.api_key:
@@ -71,30 +63,38 @@ def ensure_api_config() -> ApiConfig:
 
 
 def main() -> None:
-    init_state()
+    init_sessions()
     config = ensure_api_config()
-    render_sidebar()
+    render_session_sidebar()
+
+    messages = current_messages()
 
     st.markdown(
         """
         <style>
-        .block-container { padding-top: 1.5rem; }
+        .block-container { padding-top: 1.2rem; max-width: 52rem; }
         [data-testid="stChatMessage"] { border-radius: 12px; }
+        [data-testid="stSidebar"] [data-testid="stButton"] p {
+            text-align: left;
+            font-size: 0.85rem;
+            line-height: 1.35;
+        }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
     st.title("🎓 张雪峰 · 认知操作系统")
-    st.caption("高考志愿 / 考研 / 职业规划 — 打开即用，直接开聊")
+    st.caption("高考志愿 / 考研 / 职业规划 — 左侧可切换历史对话")
 
-    with st.expander("💡 试试这些问题", expanded=False):
-        for example in EXAMPLES:
-            if st.button(example, key=f"ex-{hash(example)}"):
+    with st.expander("💡 试试这些问题", expanded=not messages):
+        cols = st.columns(2)
+        for idx, example in enumerate(EXAMPLES):
+            if cols[idx % 2].button(example, key=f"ex-{hash(example)}"):
                 st.session_state.pending_prompt = example
                 st.rerun()
 
-    for message in st.session_state.messages:
+    for message in messages:
         avatar = "🎓" if message["role"] == "assistant" else "👤"
         with st.chat_message(message["role"], avatar=avatar):
             st.markdown(message["content"])
@@ -106,7 +106,11 @@ def main() -> None:
     if not prompt:
         return
 
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    touch_session_title(prompt)
+    messages = [*messages, {"role": "user", "content": prompt}]
+    set_current_messages(messages)
+    bump_session_order(st.session_state.current_session_id)
+
     with st.chat_message("user", avatar="👤"):
         st.markdown(prompt)
 
@@ -117,7 +121,7 @@ def main() -> None:
 
     system_prompt = build_system_prompt(search_context)
     client = create_client(config.api_key, config.base_url)
-    history = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages[:-1]]
+    history = [{"role": m["role"], "content": m["content"]} for m in messages[:-1]]
 
     with st.chat_message("assistant", avatar="🎓"):
         placeholder = st.empty()
@@ -137,7 +141,7 @@ def main() -> None:
             st.caption(f"详情: {exc}")
             return
 
-    st.session_state.messages.append({"role": "assistant", "content": reply})
+    set_current_messages([*messages, {"role": "assistant", "content": reply}])
 
 
 if __name__ == "__main__":
