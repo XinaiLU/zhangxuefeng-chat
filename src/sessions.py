@@ -6,6 +6,9 @@ from typing import Any
 
 import streamlit as st
 
+from src.client_id import ensure_client_id
+from src import storage
+
 Message = dict[str, str]
 Session = dict[str, Any]
 
@@ -30,12 +33,36 @@ def _new_session() -> Session:
     }
 
 
+def _client_id() -> str:
+    return st.session_state.client_id
+
+
+def _persist_current() -> None:
+    session = current_session()
+    storage.persist_session(_client_id(), session, st.session_state.session_order)
+    storage.set_current_session(_client_id(), st.session_state.current_session_id)
+
+
 def init_sessions() -> None:
-    if "sessions" not in st.session_state:
-        first = _new_session()
-        st.session_state.sessions = {first["id"]: first}
-        st.session_state.session_order = [first["id"]]
-        st.session_state.current_session_id = first["id"]
+    if st.session_state.get("sessions_loaded"):
+        return
+
+    client_id = ensure_client_id()
+    sessions, order, current_id = storage.load_client_data(client_id)
+
+    if not sessions:
+        session = _new_session()
+        sessions = {session["id"]: session}
+        order = [session["id"]]
+        current_id = session["id"]
+        storage.persist_session(client_id, session, order)
+        storage.set_current_session(client_id, current_id)
+
+    st.session_state.sessions = sessions
+    st.session_state.session_order = order
+    st.session_state.current_session_id = current_id or order[0]
+    st.session_state.client_id = client_id
+    st.session_state.sessions_loaded = True
 
 
 def current_session() -> Session:
@@ -53,6 +80,7 @@ def set_current_messages(messages: list[Message]) -> None:
     session["messages"] = messages
     session["updated_at"] = _now_label()
     st.session_state.sessions[session["id"]] = session
+    _persist_current()
 
 
 def create_session() -> str:
@@ -61,24 +89,31 @@ def create_session() -> str:
     st.session_state.sessions[session["id"]] = session
     st.session_state.session_order.insert(0, session["id"])
     st.session_state.current_session_id = session["id"]
+    storage.persist_session(_client_id(), session, st.session_state.session_order)
+    storage.set_current_session(_client_id(), session["id"])
     return session["id"]
 
 
 def switch_session(session_id: str) -> None:
     if session_id in st.session_state.sessions:
         st.session_state.current_session_id = session_id
+        storage.set_current_session(_client_id(), session_id)
 
 
 def delete_session(session_id: str) -> None:
     init_sessions()
     if session_id not in st.session_state.sessions:
         return
+
+    storage.delete_session_db(_client_id(), session_id)
     del st.session_state.sessions[session_id]
     st.session_state.session_order = [sid for sid in st.session_state.session_order if sid != session_id]
+
     if not st.session_state.session_order:
         create_session()
     elif st.session_state.current_session_id == session_id:
         st.session_state.current_session_id = st.session_state.session_order[0]
+        storage.set_current_session(_client_id(), st.session_state.current_session_id)
 
 
 def touch_session_title(user_text: str) -> None:
@@ -86,6 +121,7 @@ def touch_session_title(user_text: str) -> None:
     if session["title"] == "新对话" and user_text.strip():
         session["title"] = _title_from_message(user_text)
         st.session_state.sessions[session["id"]] = session
+        _persist_current()
 
 
 def bump_session_order(session_id: str) -> None:
@@ -93,6 +129,7 @@ def bump_session_order(session_id: str) -> None:
     if session_id in order:
         order.remove(session_id)
     order.insert(0, session_id)
+    storage.save_session_order(_client_id(), order)
 
 
 def render_session_sidebar() -> None:
@@ -130,6 +167,6 @@ def render_session_sidebar() -> None:
                     st.rerun()
 
         st.divider()
-        st.caption("对话记录保存在当前浏览器会话中，刷新页面后仍会保留。")
+        st.caption("对话已保存到本机数据库，同一浏览器下次打开会自动恢复。")
         st.markdown("[zhangxuefeng-skill](https://github.com/XinaiLU/zhangxuefeng-skill)")
         st.caption("角色扮演仅供参考，非张雪峰本人观点。")
