@@ -84,7 +84,7 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    st.title("🎓 张雪峰 · 认知操作系统")
+    st.title("🎓 对话张雪峰 - 为我生成一张雪峰的志愿")
     st.caption("高考志愿 / 考研 / 职业规划 — 左侧可切换历史对话")
 
     with st.expander("💡 试试这些问题", expanded=not messages):

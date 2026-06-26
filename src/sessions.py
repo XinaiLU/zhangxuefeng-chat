@@ -167,6 +167,6 @@ def render_session_sidebar() -> None:
                     st.rerun()
 
         st.divider()
-        st.caption("对话已保存到本机数据库，同一浏览器下次打开会自动恢复。")
+        st.caption("对话已保存到 data/*.csv，同一浏览器下次打开会自动恢复。")
         st.markdown("[zhangxuefeng-skill](https://github.com/XinaiLU/zhangxuefeng-skill)")
         st.caption("角色扮演仅供参考，非张雪峰本人观点。")

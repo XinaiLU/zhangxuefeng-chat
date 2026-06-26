@@ -5,3 +5,4 @@ __pycache__/
 .streamlit/secrets.toml
 skills/zhangxuefeng-skill/.git/
 data/
+*.db
