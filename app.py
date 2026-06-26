@@ -14,9 +14,10 @@ from src.sessions import (
     set_current_messages,
     touch_session_title,
 )
+from src.ui import inject_styles, render_hero
 
 st.set_page_config(
-    page_title="张雪峰 · 志愿顾问",
+    page_title="对话张雪峰",
     page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -65,32 +66,15 @@ def ensure_api_config() -> ApiConfig:
 def main() -> None:
     init_sessions()
     config = ensure_api_config()
+    inject_styles()
     render_session_sidebar()
 
     messages = current_messages()
-
-    st.markdown(
-        """
-        <style>
-        .block-container { padding-top: 1.2rem; max-width: 52rem; }
-        [data-testid="stChatMessage"] { border-radius: 12px; }
-        [data-testid="stSidebar"] [data-testid="stButton"] p {
-            text-align: left;
-            font-size: 0.85rem;
-            line-height: 1.35;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.title("🎓 对话张雪峰 - 为我生成一张雪峰的志愿")
-    st.caption("高考志愿 / 考研 / 职业规划 — 左侧可切换历史对话")
+    render_hero()
 
     with st.expander("💡 试试这些问题", expanded=not messages):
-        cols = st.columns(2)
-        for idx, example in enumerate(EXAMPLES):
-            if cols[idx % 2].button(example, key=f"ex-{hash(example)}"):
+        for example in EXAMPLES:
+            if st.button(example, key=f"ex-{hash(example)}", use_container_width=True):
                 st.session_state.pending_prompt = example
                 st.rerun()
 

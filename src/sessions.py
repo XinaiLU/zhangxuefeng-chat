@@ -8,6 +8,7 @@ import streamlit as st
 
 from src.client_id import ensure_client_id
 from src import storage
+from src.ui import render_session_meta
 
 Message = dict[str, str]
 Session = dict[str, Any]
@@ -17,7 +18,7 @@ def _now_label() -> str:
     return datetime.now().strftime("%m-%d %H:%M")
 
 
-def _title_from_message(text: str, max_len: int = 18) -> str:
+def _title_from_message(text: str, max_len: int = 14) -> str:
     cleaned = " ".join(text.split())
     if len(cleaned) <= max_len:
         return cleaned or "新对话"
@@ -135,7 +136,7 @@ def bump_session_order(session_id: str) -> None:
 def render_session_sidebar() -> None:
     init_sessions()
     with st.sidebar:
-        st.markdown("### 💬 对话记录")
+        st.markdown('<p class="sidebar-title">💬 对话记录</p>', unsafe_allow_html=True)
         if st.button("➕ 新对话", use_container_width=True, type="primary"):
             create_session()
             st.rerun()
@@ -146,22 +147,25 @@ def render_session_sidebar() -> None:
             session = st.session_state.sessions[sid]
             is_active = sid == st.session_state.current_session_id
             label = session["title"]
+            if len(label) > 16:
+                label = label[:16] + "…"
             time_label = session.get("updated_at", "")
             rounds = len(session.get("messages", [])) // 2
-            btn_label = f"{label}\n{time_label} · {rounds}轮"
 
-            col_main, col_del = st.columns([5, 1])
+            col_main, col_del = st.columns([6, 1])
             with col_main:
                 btn_type = "primary" if is_active else "secondary"
                 if st.button(
-                    btn_label,
+                    label,
                     key=f"session-{sid}",
                     use_container_width=True,
                     type=btn_type,
                 ):
                     switch_session(sid)
                     st.rerun()
+                render_session_meta(time_label, rounds, is_active)
             with col_del:
+                st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
                 if st.button("🗑", key=f"del-{sid}", help="删除此对话"):
                     delete_session(sid)
                     st.rerun()
