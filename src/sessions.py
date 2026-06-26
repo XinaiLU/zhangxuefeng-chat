@@ -8,7 +8,8 @@ import streamlit as st
 
 from src.client_id import ensure_client_id
 from src import storage
-from src.ui import render_session_meta
+from src.ui import render_session_meta, render_model_info
+from src.config import ApiConfig
 
 Message = dict[str, str]
 Session = dict[str, Any]
@@ -133,9 +134,13 @@ def bump_session_order(session_id: str) -> None:
     storage.save_session_order(_client_id(), order)
 
 
-def render_session_sidebar() -> None:
+def render_session_sidebar(config: ApiConfig) -> None:
     init_sessions()
     with st.sidebar:
+        st.markdown('<p class="sidebar-title">🤖 基模说明</p>', unsafe_allow_html=True)
+        render_model_info(config)
+
+        st.divider()
         st.markdown('<p class="sidebar-title">💬 对话记录</p>', unsafe_allow_html=True)
         if st.button("➕ 新对话", use_container_width=True, type="primary"):
             create_session()
@@ -171,5 +176,6 @@ def render_session_sidebar() -> None:
                     st.rerun()
 
         st.divider()
+        st.caption("对话已保存到 data/*.csv，同一浏览器下次打开会自动恢复。")
         st.markdown("[zhangxuefeng-skill](https://github.com/XinaiLU/zhangxuefeng-skill)")
         st.caption("角色扮演仅供参考，非张雪峰本人观点。")

@@ -61,3 +61,27 @@ def load_api_config() -> ApiConfig:
         )
 
     return ApiConfig(api_key="", base_url=None, model="", enable_search=enable_search)
+
+
+PROVIDER_LABELS = {
+    "qwen": "通义千问 · 阿里云百炼",
+    "openai": "OpenAI 兼容接口",
+}
+
+MODEL_LABELS = {
+    "qwen-plus": "通义千问 Plus",
+    "qwen-turbo": "通义千问 Turbo",
+    "qwen-max": "通义千问 Max",
+    "qwen3.7-max": "通义千问 3.7 Max",
+    "qwen3.7-plus": "通义千问 3.7 Plus",
+    "gpt-4o-mini": "GPT-4o Mini",
+    "gpt-4o": "GPT-4o",
+}
+
+
+def model_display_name(model: str) -> str:
+    return MODEL_LABELS.get(model, model)
+
+
+def provider_display_name(provider: str) -> str:
+    return PROVIDER_LABELS.get(provider, provider)

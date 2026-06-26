@@ -4,6 +4,8 @@ import html
 
 import streamlit as st
 
+from src.config import ApiConfig, model_display_name, provider_display_name
+
 
 def inject_styles() -> None:
     st.markdown(
@@ -85,6 +87,16 @@ def inject_styles() -> None:
             color: #be123c;
         }
 
+        .model-info {
+            font-size: 0.82rem;
+            color: #374151;
+            line-height: 1.55;
+            margin: 0;
+        }
+        .model-info strong {
+            color: #111827;
+        }
+
         div[data-testid="stExpander"] {
             border: 1px solid #eceff3;
             border-radius: 12px;
@@ -103,6 +115,26 @@ def render_hero() -> None:
             <h1 class="hero-title">对话张雪峰</h1>
             <p class="hero-sub">——请为我生成一张雪峰的志愿</p>
         </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_model_info(config: ApiConfig) -> None:
+    search_text = "已开启（涉及专业/就业时会检索公开信息）" if config.enable_search else "已关闭"
+    provider = html.escape(provider_display_name(config.provider))
+    model_name = html.escape(model_display_name(config.model))
+    model_id = html.escape(config.model)
+
+    st.markdown(
+        f"""
+        <p class="model-info">
+            <strong>基模</strong>：{model_name}<br>
+            <strong>模型 ID</strong>：<code>{model_id}</code><br>
+            <strong>提供商</strong>：{provider}<br>
+            <strong>联网检索</strong>：{html.escape(search_text)}<br>
+            <strong>角色 Skill</strong>：zhangxuefeng-skill
+        </p>
         """,
         unsafe_allow_html=True,
     )

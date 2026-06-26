@@ -66,7 +66,7 @@ def main() -> None:
     init_sessions()
     config = ensure_api_config()
     inject_styles()
-    render_session_sidebar()
+    render_session_sidebar(config)
 
     messages = current_messages()
     render_hero()
