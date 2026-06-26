@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import streamlit as st
 
 from src.llm import chat_stream, create_client
 from src.prompt import build_system_prompt
 from src.search import web_search
+from src.config import ApiConfig, load_api_config
 
 st.set_page_config(
     page_title="张雪峰 · 志愿顾问",
     page_icon="🎓",
     layout="centered",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 EXAMPLES = [
@@ -51,79 +50,30 @@ def init_state() -> None:
         st.session_state.messages = []
 
 
-def build_qwen_base_url(workspace_id: str) -> str:
-    ws = workspace_id.strip().removeprefix("https://").split(".")[0]
-    return f"https://{ws}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
-
-
-def get_secret(section: str, key: str, default: str = "") -> str:
-    try:
-        return str(st.secrets[section][key])
-    except (KeyError, FileNotFoundError, AttributeError):
-        return default
-
-
-def render_sidebar() -> tuple[str, Optional[str], str, bool]:
-    qwen_key = get_secret("qwen", "api_key")
-    qwen_ws = get_secret("qwen", "workspace_id")
-    qwen_model = get_secret("qwen", "model", "qwen-plus")
-    openai_key = get_secret("openai", "api_key")
-    openai_base = get_secret("openai", "base_url")
-    openai_model = get_secret("openai", "model", "gpt-4o-mini")
-    has_qwen_secrets = bool(qwen_key and qwen_ws)
-
+def render_sidebar() -> None:
     with st.sidebar:
-        st.title("⚙️ 设置")
-        default_provider = "通义千问 (Qwen)" if has_qwen_secrets else "OpenAI / 其他兼容接口"
-        provider = st.selectbox("模型提供商", ["通义千问 (Qwen)", "OpenAI / 其他兼容接口"], index=0 if default_provider.startswith("通义") else 1)
+        st.markdown("### 关于")
+        st.caption("高考志愿 / 考研 / 职业规划的 AI 对话演示")
+        st.markdown("[zhangxuefeng-skill](https://github.com/XinaiLU/zhangxuefeng-skill)")
+        st.caption("角色扮演基于公开言论推断，非张雪峰本人观点，仅供参考。")
+        if st.button("清空对话", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
 
-        if provider.startswith("通义"):
-            st.caption(
-                "新版 Key 以 `sk-ws` 开头，需在百炼控制台 → "
-                "[业务空间](https://bailian.console.aliyun.com/?tab=globalset#/workspace) 查看 Workspace ID"
-            )
-            api_key = st.text_input(
-                "API Key",
-                value=qwen_key,
-                type="password",
-                help="也可在 Streamlit Secrets 中配置 qwen.api_key",
-            )
-            workspace_id = st.text_input(
-                "Workspace ID",
-                value=qwen_ws,
-                placeholder="ws-xxxxxxxx",
-                help="例如 ws-022uxw9j9omqsn，不是完整 URL",
-            )
-            base_url = build_qwen_base_url(workspace_id) if workspace_id.strip() else None
-            if base_url:
-                st.text_input("Base URL（自动生成）", value=base_url, disabled=True)
-            model = st.text_input("模型", value=qwen_model or "qwen-plus", help="如 qwen-plus、qwen3.7-max、qwen-turbo")
-        else:
-            api_key = st.text_input(
-                "API Key",
-                value=openai_key,
-                type="password",
-                help="也可在 Streamlit Secrets 中配置 openai.api_key",
-            )
-            base_url = st.text_input(
-                "Base URL（可选）",
-                value=openai_base,
-                placeholder="https://api.openai.com/v1",
-                help="DeepSeek、Moonshot 等兼容 OpenAI 的地址",
-            ) or None
-            model = st.text_input("模型", value=openai_model or "gpt-4o-mini")
 
-        enable_search = st.toggle("联网检索", value=True, help="涉及专业/就业等问题时先搜公开信息")
-        st.divider()
-        st.caption("Skill 来源")
-        st.markdown("[XinaiLU/zhangxuefeng-skill](https://github.com/XinaiLU/zhangxuefeng-skill)")
-        st.caption("仅供学习交流，角色扮演非本人观点。")
-    return api_key, base_url or None, model, enable_search
+def ensure_api_config() -> ApiConfig:
+    config = load_api_config()
+    if not config.api_key:
+        st.error("服务暂未就绪，请稍后再试。")
+        st.caption("（管理员：请在 `.streamlit/secrets.toml` 或 Streamlit Cloud Secrets 中配置 qwen 或 openai 节）")
+        st.stop()
+    return config
 
 
 def main() -> None:
     init_state()
-    api_key, base_url, model, enable_search = render_sidebar()
+    config = ensure_api_config()
+    render_sidebar()
 
     st.markdown(
         """
@@ -136,7 +86,7 @@ def main() -> None:
     )
 
     st.title("🎓 张雪峰 · 认知操作系统")
-    st.caption("高考志愿 / 考研 / 职业规划 — 基于 zhangxuefeng-skill 的 Streamlit 对话前端")
+    st.caption("高考志愿 / 考研 / 职业规划 — 打开即用，直接开聊")
 
     with st.expander("💡 试试这些问题", expanded=False):
         for example in EXAMPLES:
@@ -156,21 +106,17 @@ def main() -> None:
     if not prompt:
         return
 
-    if not api_key:
-        st.error("请先在左侧侧边栏填写 API Key。")
-        return
-
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user", avatar="👤"):
         st.markdown(prompt)
 
     search_context = None
-    if enable_search and needs_web_search(prompt):
+    if config.enable_search and needs_web_search(prompt):
         with st.status("张雪峰正在查数据…", expanded=False):
             search_context = web_search(f"{prompt} 2026 就业 薪资 录取", max_results=5)
 
     system_prompt = build_system_prompt(search_context)
-    client = create_client(api_key, base_url)
+    client = create_client(config.api_key, config.base_url)
     history = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages[:-1]]
 
     with st.chat_message("assistant", avatar="🎓"):
@@ -179,7 +125,7 @@ def main() -> None:
             chunks: list[str] = []
             for piece in chat_stream(
                 client,
-                model=model,
+                model=config.model,
                 system_prompt=system_prompt,
                 messages=[*history, {"role": "user", "content": prompt}],
             ):
@@ -187,14 +133,8 @@ def main() -> None:
                 placeholder.markdown("".join(chunks))
             reply = "".join(chunks)
         except Exception as exc:
-            err = str(exc)
-            st.error(f"模型调用失败: {err}")
-            if "404" in err:
-                st.info(
-                    "常见原因：① Base URL 不完整（通义需填 Workspace ID，不是 `https://ws-xxx`）；"
-                    "② 模型名拼写错误；③ Key 与地域不匹配。"
-                    "通义正确格式：`https://ws-你的ID.cn-beijing.maas.aliyuncs.com/compatible-mode/v1`"
-                )
+            st.error("回复生成失败，请稍后重试。")
+            st.caption(f"详情: {exc}")
             return
 
     st.session_state.messages.append({"role": "assistant", "content": reply})

@@ -14,18 +14,31 @@ streamlit run app.py
 
 浏览器打开终端显示的本地地址（通常是 `http://localhost:8501`）。
 
-## 配置
+## 配置 API（仅管理员，访客不可见）
 
-在 Streamlit 左侧边栏填写：
+API Key **不会**出现在前端界面，只通过 Secrets 配置：
 
-| 项 | 说明 |
-|---|---|
-| API Key | OpenAI 或兼容接口密钥 |
-| Base URL | 可选，如 DeepSeek `https://api.deepseek.com/v1` |
-| 模型 | 如 `gpt-4o-mini`、`deepseek-chat` |
-| 联网检索 | 涉及专业/就业类问题时先用 DuckDuckGo 搜公开信息 |
+**本地开发：**
 
-也可复制 `.env.example` 为 `.env` 本地保存（当前版本以侧边栏输入为主）。
+```bash
+cp .streamlit/secrets.toml.example .streamlit/secrets.toml
+# 编辑 secrets.toml，填入你的百炼 Key 和 Workspace ID
+streamlit run app.py
+```
+
+**Streamlit Cloud：** 在 App → Settings → Secrets 粘贴：
+
+```toml
+[qwen]
+api_key = "sk-ws-你的百炼APIKey"
+workspace_id = "ws-你的WorkspaceID"
+model = "qwen-plus"
+
+[app]
+enable_search = true
+```
+
+保存后重新部署，访客打开页面即可直接聊天，无需填写任何 Key。
 
 ## 项目结构
 
